@@ -1,0 +1,258 @@
+---
+title: "eds221-day7-wrangling"
+format: html
+editor: visual
+---
+
+## Setup
+
+```{r}
+library(tidyverse)
+library(palmerpenguins)
+library(lubridate)
+library(dplyr)
+library(datapasta)
+library(stringr)
+```
+
+## Data Wrangling Refresher
+
+```{r}
+# Pipe 1:
+
+penguins_df1 <- palmerpenguins::penguins %>% 
+  # Only include penguins from Biscoe and Dream
+  filter(island == "Biscoe" | island == "Dream") %>%
+  # Remove the year and sex variables (filter(island %in% c("Briscoe", "Dream")))
+  select(-year, -sex) %>% 
+  # Add new column called body_mass_kg
+  mutate(body_mass_kg = (body_mass_g / 1000)) %>%
+  #Rename island variable to location
+  rename(location = island)
+```
+
+```{r}
+# Pipe 2
+
+penguins_df2 <- palmerpenguins::penguins %>% 
+  filter(species == "Adelie") %>% 
+  filter(!is.na(flipper_length_mm)) %>% 
+  group_by(sex) %>% 
+  summarize(mean_flipper_length_mm = mean(flipper_length_mm),
+            std_flipper_length_mm = sd(flipper_length_mm), 
+            sample_size = n())
+```
+
+## Joins of different flavors
+### Mutating joins
+```{r}
+library(datapasta)
+animals <- tibble::tribble(
+  ~location,   ~species,  ~maturity,
+   "lagoon",   "bobcat",    "adult",
+    "bluff",   "coyote", "juvenile",
+    "creek",      "fox",    "adult",
+     "oaks", "squirrel", "juvenile",
+    "bluff",   "bobcat",    "adult"
+  )
+
+sites <- tibble::tribble(
+  ~location,      ~full_site_name, ~jurisdiction,
+    "beach",       "Goleta Beach",     "SB City",
+   "lagoon",        "UCSB Lagoon",        "UCSB",
+    "bluff",       "Ellwood Mesa",     "SB City",
+     "oaks", "Fremont Campground",        "USFS"
+  )
+```
+full_join()
+```{r}
+# Nothing is excluded
+full_join_example <- full_join(animals, sites)
+
+full_join_example
+
+```
+left_join()
+```{r}
+left_join_example <- left_join(animals, sites)
+
+left_join_example
+```
+right_join()
+```{r}
+right_join_example <- right_join(animals, sites)
+
+right_join_example
+```
+inner_join()
+```{r}
+inner_join_example <- inner_join(animals, sites)
+
+inner_join_example
+```
+### Filtering Joins
+semi_join() - returns all rows from x with a match in y
+```{r}
+semi_join_example <- semi_join(animals, sites)
+
+semi_join_example
+```
+anti_join() - returns all rows from x with a match in y
+```{r}
+anti_join_example <- anti_join(animals, sites)
+
+anti_join_example
+
+```
+## Easier dates and times with {lubridate}
+```{r}
+my_date <- "03-15-1998"
+mdy(my_date)
+
+my_date <- "11/7/2003"
+mdy(my_date)
+
+my_date <- "08-Jun-1974"
+dmy(my_date)
+
+my_date <- "19610518"
+lubridate::ymd(my_date)
+```
+### Times/Time zones
+```{r}
+time <- "2020-08-12 11:18"
+time <- ymd_hm(time)
+time # Note that the default is UTC
+
+class(time) # Class is POSIXct
+
+# Convert to PDT:
+with_tz(time, "America/Los_Angeles")
+
+# Convert to AEST:
+with_tz(time, "Australia/Sydney")
+
+# pull just the time
+my_time <- ymd_hms(time)
+week(my_time)
+day(my_time)
+hour(my_time)
+minute(my_time)
+second(my_time)
+```
+More time examples
+```{r}
+# Get your system time
+comp_time <- Sys.time()
+
+# Convert comp_time to Europe/Belgrade time: 
+with_tz(comp_time, "Europe/Belgrade")
+```
+### Pulling pieces
+```{r}
+teddy_bday <- ymd("20170615")
+# return the date
+teddy_bday
+
+# What day of the week? 
+wday(teddy_bday, label = TRUE)
+
+# What week of the year?
+week(teddy_bday)
+
+# Pull the year
+year(teddy_bday)
+
+# Month
+month(teddy_bday)
+```
+### Date pieces as new columns
+```{r}
+urchin_counts <- tribble(
+  ~date, ~species, ~size_mm,
+  "10/3/2020", "purple", 55,
+  "10/4/2020", "red", 48,
+  "11/17/2020", "red", 67
+)
+
+urchin_counts_ymd <- urchin_counts %>% 
+  mutate(date = lubridate::mdy(date)) %>% 
+  mutate(year = year(date),
+         month = month(date),
+         day = day(date))
+
+urchin_counts_ymd
+```
+Find durations of times
+```{r}
+day_1 <- lubridate::ymd("2020-01-06")
+day_2 <- lubridate::ymd("2020-05-18")
+day_3 <- lubridate::ymd("2020-05-19")
+
+# Create a time interval
+time_interval <- interval(day_1, day_2)
+
+# Check the length in weeks
+time_length(time_interval, "week")
+
+# Check the length in years
+time_length(time_interval, "year")
+```
+## Strings with stringr
+```{r}
+my_string <- "Teddy loves eating salmon and socks."
+
+# Does the pattern "love" exist within the string?
+my_string %>% str_detect("love")
+
+# Does the pattern "pup" exist within the string?
+my_string %>% str_detect("pup")
+
+```
+This also works on vectors
+```{r}
+my_string <- c("burrito", "fish taco", "Taco salad")
+
+# Does the vector element contain the pattern "fish"?
+my_string %>% str_detect("fish")
+```
+Most useful when used in combination with other functions
+### str_detect()
+```{r}
+head(starwars)
+
+skywalkers <- starwars %>% 
+  filter(str_detect(name, "Skywalker"))
+
+skywalkers
+```
+### str_replace()
+```{r}
+firewalkers <- starwars %>% 
+  mutate(name = str_replace(name, pattern = "Sky", replacement = "Fire"))
+
+head(firewalkers)
+```
+### str_trim() or str_squish()
+```{r}
+feedback <- c(" I ate     some   nachos", "Wednesday morning   ")
+
+# Removes leading, trailing & duplicate interior whitespaces
+str_squish(feedback)
+
+# Removes leading & trailing whitespaces
+str_trim(feedback)
+```
+### Convert cases
+```{r}
+str_to_lower(feedback)
+
+str_to_upper(feedback)
+
+str_to_title(feedback)
+```
+### Count matches in a string
+```{r}
+str_count(feedback, pattern = "nachos")
+```
+
